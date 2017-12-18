@@ -1,0 +1,267 @@
+﻿@using MS_Demo_Client.Models
+@model HomeViewModel
+@{
+    ViewBag.Title = "Micro Services Client Demo Page";
+}
+
+<div id="serviceDemo" data-bind="visible:true" style="display: none;">
+    <div class="loading-mask" data-bind="visible: isLoading()">Loading.....</div>
+    <div class="row form-group">
+        <div class="col-sm-12">
+            <h1>Micro Services Demo Client</h1>
+            <p>Select a service and a method from the lists below.</p>
+        </div>
+    </div>
+    <div class="panel panel-default">
+        <div class="panel-body">
+            <div class="row">
+                <div class="col-sm-3">
+                    <select class="form-control" data-bind="options:services, optionsCaption: '--Choose a Service--', optionsText: 'name', optionsValue: 'id', value: selectedService"></select>
+                </div>
+                <div class="col-sm-3">
+                    <select class="form-control" data-bind="options: serviceMethods, optionsCaption: '--Choose a Service Method--', optionsText: 'name', optionsValue: 'url', value: selectedServiceMethod, enable: serviceMethods().length"></select>
+                </div>
+                <div class="col-sm-6">
+                    <button type="button" id="btnMakeRequest" class="btn btn-primary" data-bind="click: loadServiceMethod, enable: serviceMethods().length">GO <span class="glyphicon glyphicon-play"></span></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="results-wrap" data-bind="visible:hasData()">
+        <div class="row">
+            <div class="col-sm-12">
+                <h3>Results <small>(URL: <span data-bind="text:selectedServiceMethod"></span>)</small></h3>
+            </div>
+        </div>
+        <div class="row" data-bind="visible: total() > pageSize">
+            <div class="col-sm-12">
+                <div class="pull-right">
+                    <strong>Showing <span data-bind="text: currentStartVal"></span> to <span data-bind="text: currentEndVal"></span> of <span data-bind="text: total"></span> records</strong>
+                </div>
+            </div>
+        </div>
+        <div class="row" data-bind="visible: total() >  pageSize">
+            <div class="col-sm-12">
+                <div data-bind="pagination: { currentPage: page, pageSize: pageSize, totalCount: total, maxPages: maxPages, directions: directions, boundary: boundary }"></div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-sm-12">
+                <div class="alert alert-info">
+                    <div class="row">
+                        <div class="col-sm-12">
+                            <div class="pull-left"><strong>Total Results:</strong> <span data-bind="text:total"></span>
+                            </div>
+                            <div class="pull-right"><strong>Server Response Time:</strong> <span data-bind="text:serviceRequestTime"></span> ms
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-sm-12">
+                <div class="table-responsive">
+                    <table class="table table-striped table-bordered">
+                        <thead>
+                        <tr>
+                            <!-- ko foreach: resultColumns -->
+                            <th><span data-bind="text:$data.displayName"></span></th>
+                            <!-- /ko -->
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <!-- ko foreach: results -->
+                        <tr>
+                            <!-- ko foreach: $root.resultColumns -->
+                            <td><span data-bind="text: $parent[$data.name]"></span></td>
+                            <!-- /ko -->
+                        </tr>
+                        <!-- /ko -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="row" data-bind="visible: total() >  pageSize">
+            <div class="col-sm-12">
+                <div data-bind="pagination: { currentPage: page, pageSize: pageSize, totalCount: total, maxPages: maxPages, directions: directions, boundary: boundary }"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    /**Cascading Dropdowns Example: http://jsfiddle.net/GWVW8/2/ **/
+    var serviceListData = {};
+    serviceListData.serviceCallUrl = '/api/callmicroservice';
+
+    serviceListData.dropDownData = @Html.Raw(Json.Encode(Model.ServiceListData));
+
+    console.log(serviceListData);
+
+    function dfCapitalize(string)
+    {
+        return string.charAt(0).toUpperCase() + string.slice(1);
+    }
+
+    var ServiceMethodViewModel = function(itm, parent) {
+        var self = this;
+
+        if (itm === null || itm === 'undefined') return;
+
+        self.serviceId = itm.ServiceId;
+        self.name = itm.Name;
+        self.path = itm.Path;
+        self.url = parent.url + ':' + parent.port + '/' + self.path;
+    };
+
+    var ServiceViewModel = function(itm) {
+        var self = this;
+
+        if (itm === null || itm === 'undefined') return;
+
+        self.id = itm.Id;
+        self.name = itm.Name;
+        self.url = itm.Url;
+        self.port = itm.Port;
+        self.methods = [];
+
+        for (var i = 0; i < itm.Methods.length; i++) {
+            var method = new ServiceMethodViewModel(itm.Methods[i], self);
+            self.methods.push(method);
+        }
+    }
+
+    var SearchServicesViewModel = function() {
+        var self = this;
+
+        function getById(items, value) {
+            if(!value) {
+                return [];
+            }
+
+            var result = ko.utils.arrayFirst(items, function(item) {
+                return item.id === value;
+            });
+
+            return result && result.methods || [];
+        }
+
+        //Load Services
+        self.services = [];
+        self.selectedService = ko.observable();
+        self.selectedServiceMethod = ko.observable();
+
+        for (var i = 0; i < serviceListData.dropDownData.length; i++) {
+            var service = new ServiceViewModel(serviceListData.dropDownData[i]);
+            self.services.push(service);
+        }
+
+        //Handle Change to Service Drop Down
+        self.serviceMethods = ko.computed(function() {
+            var items = self.services;
+            var id = self.selectedService();
+            return getById(items, id);
+        });
+
+        //Service Response Data
+        self.isLoading = ko.observable(false);
+        self.hasData = ko.observable(false);
+        self.serviceRequestTime = ko.observable(0);
+        self.resultColumns = ko.observableArray();
+        self.results = ko.observableArray([]);
+        self.hasPagination = ko.observable(false);
+        self.resultsPage = ko.observableArray([]);
+
+        //Pagination
+        self.total = ko.observable(0);
+        self.page = ko.observable(1);
+        self.maxPages = ko.observable(10);
+        self.directions = ko.observable(true);
+        self.boundary = false;
+        self.pageSize = 25;
+        self.currentStartVal = ko.observable(1);
+        self.currentEndVal = ko.observable(self.pageSize);
+        
+        self.page.subscribe(function(newVal) {
+            var startVal = (newVal === 1) ?  1 : ((newVal - 1) * self.pageSize);
+            var endVal = (startVal + self.pageSize) < self.total() ? ((startVal === 1 ? self.pageSize : startVal + self.pageSize)) : self.total();
+            self.currentStartVal(startVal);
+            self.currentEndVal(endVal);
+            self.resultsPage(self.results().splice(startVal, endVal));
+        });
+        
+        //Handle Button Click
+        self.loadServiceMethod = function() {
+            self.isLoading(true);
+            self.resultsPage([]);
+            self.results([]);
+            self.page(1);
+            
+            jQuery.ajax({
+                type: 'POST',
+                url: serviceListData.serviceCallUrl,
+                start_time: new Date().getTime(),
+                data: {
+                    url: self.selectedServiceMethod()
+                }
+            }).done(function(data) {
+                
+                self.hasData(true);
+
+                var isResultArray = Array.isArray(data.Data);
+
+                self.serviceRequestTime(data.TimeElapsedMs);
+
+                self.total(isResultArray ? data.Data.length : 1);
+
+                var firstItemInResults = {};
+                if (isResultArray) {
+                    firstItemInResults = data.Data[0];
+                    self.results(data.Data);
+                } else {
+                    firstItemInResults = data.Data;
+                    self.results.push(data.Data);
+                }
+
+                //Pagination Setup
+                if (self.results().length > self.pageSize) {
+                    self.resultsPage(self.results().splice(0, self.pageSize));
+                } else {
+                    self.resultsPage(self.results());
+                }
+
+                self.resultColumns(dfGenerateColumnHeaders(firstItemInResults));
+            }).always(function() {
+                self.isLoading(false);
+            });
+        };
+    };
+
+    function dfGenerateColumnHeaders(item) {
+        var columns = [];
+        var resultProperties = Object.getOwnPropertyNames(item);
+        var maxColumns = resultProperties.length > 12 ? 5 : resultProperties.length;
+
+        for (var i = 0; i < maxColumns; i++) {
+
+            var hdrItm = {
+                name: resultProperties[i],
+                displayName: dfCapitalize(resultProperties[i])
+            }
+
+            columns.push(hdrItm);
+        }
+
+        return columns;
+    }
+
+
+    jQuery(document).ready(function() {
+        var vm = new SearchServicesViewModel();
+        ko.applyBindings(vm, document.getElementById('serviceDemo'));
+    });
+</script>
+
