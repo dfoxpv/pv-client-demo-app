@@ -25,6 +25,19 @@ namespace MS_Demo_Client.Controllers
             return View(model);
         }
 
+        public ActionResult EncryptionDemo()
+        {
+            var serviceDropDownData = GetServiceDropDownData();
+            var servicesToInclude = new List<int> {3, 5};
+
+            var model = new HomeViewModel
+            {
+                ServiceListData = serviceDropDownData.Where(x => servicesToInclude.Contains(x.Id)).ToList()
+            };
+
+            return View("EncyptionDemo", model);
+        }
+
         public ActionResult About()
         {
             ViewBag.Message = "Your application description page.";
@@ -43,6 +56,7 @@ namespace MS_Demo_Client.Controllers
         private List<ServiceModel> GetServiceDropDownData()
         {
             const string ServiceUrl = "http://10.25.232.179";
+            //const string ServiceUrl = "http://localhost";
 
             var servicesList = new List<ServiceModel>
             {
@@ -87,6 +101,21 @@ namespace MS_Demo_Client.Controllers
                 new ServiceModel
                 {
                     Id = 3,
+                    EncryptedMethods = new List<ServiceMethodModel>
+                    {
+                        new ServiceMethodModel
+                        {
+                            Name = "Get Status (Encrypted)",
+                            Path = "status/e",
+                            ServiceId = 3
+                        },
+                        new ServiceMethodModel
+                        {
+                            Name = "Get Services List (Encrypted)",
+                            Path = "services/e",
+                            ServiceId = 3
+                        }
+                    },
                     Methods = new List<ServiceMethodModel>
                     {
                         new ServiceMethodModel
@@ -94,10 +123,16 @@ namespace MS_Demo_Client.Controllers
                             Name = "Get Status",
                             Path = "status",
                             ServiceId = 3
+                        },
+                        new ServiceMethodModel
+                        {
+                            Name = "Get Services List",
+                            Path = "services",
+                            ServiceId = 3
                         }
                     },
-                    Name = "Status",
-                    Port = 8501,
+                    Name = "Services",
+                    Port = 8502,
                     Url = ServiceUrl
                 },
                 new ServiceModel
@@ -108,7 +143,7 @@ namespace MS_Demo_Client.Controllers
                         new ServiceMethodModel
                         {
                             Name = "Get Log Book",
-                            Path = "GetLogBook/148&devtest",
+                            Path = "GetLogBook/1484&devtest",
                             ServiceId = 4
                         },
                         new ServiceMethodModel
@@ -119,12 +154,33 @@ namespace MS_Demo_Client.Controllers
                         }
                     },
                     Name = "LogBook",
-                    Port = 8001,
+                    Port = 8011,
                     Url = ServiceUrl
                 },
                 new ServiceModel
                 {
                     Id = 5,
+                    EncryptedMethods = new List<ServiceMethodModel>
+                    {
+                        new ServiceMethodModel
+                        {
+                            Name = "Vaccine Group List (Encrypted)",
+                            Path = "VaccineGroupList/e",
+                            ServiceId = 5
+                        },
+                        new ServiceMethodModel
+                        {
+                            Name = "Vaccine Production Name List (Encrypted)",
+                            Path = "VaccineProductionNameList/e",
+                            ServiceId = 5
+                        },
+                        new ServiceMethodModel
+                        {
+                            Name = "Practice List (Encrypted)",
+                            Path = "PracticeList/e",
+                            ServiceId = 5
+                        }
+                    },
                     Methods = new List<ServiceMethodModel>
                     {
                         new ServiceMethodModel

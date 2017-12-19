@@ -1,27 +1,27 @@
 ﻿@using MS_Demo_Client.Models
 @model HomeViewModel
 @{
-    ViewBag.Title = "Micro Services Client Demo Page";
+    ViewBag.Title = "Micro Services Encryption Demo Page";
 }
 
 <div id="serviceDemo" data-bind="visible:true" style="display: none;">
     <div class="loading-mask" data-bind="visible: isLoading()">Loading.....</div>
     <div class="row form-group">
         <div class="col-sm-12">
-            <h1>Micro Services Demo Client</h1>
-            <p>Select a service and a method from the lists below.</p>
+            <h1>Encrypted Micro Services Demo Client</h1>
+            <p>This page demonstrates the ability to request ecrypted data from the server.  The client can decrypt the data after being retrieved from the microservice.</p>
         </div>
     </div>
     <div class="panel panel-default">
         <div class="panel-body">
-            <div class="row">
+            <div class="row form-group">
                 <div class="col-sm-3">
                     <select class="form-control" data-bind="options:services, optionsCaption: '--Choose a Service--', optionsText: 'name', optionsValue: 'id', value: selectedService"></select>
                 </div>
                 <div class="col-sm-3">
-                    <select class="form-control" data-bind="options: serviceMethods, optionsCaption: '--Choose a Service Method--', optionsText: 'name', optionsValue: 'url', value: selectedServiceMethod, enable: serviceMethods().length"></select>
+                    <select class="form-control" id="encryptedMethods1" data-bind="options: serviceMethods, optionsCaption: '--Choose a Service Method--', optionsText: 'name', optionsValue: 'url', value: selectedServiceMethod, enable: serviceMethods().length"></select>
                 </div>
-                <div class="col-sm-6">
+                <div class="col-sm-4">
                     <button type="button" id="btnMakeRequest" class="btn btn-primary" data-bind="click: loadServiceMethod, enable: enableGoButton()">GO <span class="glyphicon glyphicon-play"></span></button>
                     <button type="button" class="btn btn-default" data-bind="click: resetPage">Reset <i class="glyphicon glyphicon-refresh"></i></button>
                 </div>
@@ -33,7 +33,38 @@
         <p><span data-bind="html: ajaxErrorMessage"></span></p>
     </div>
 
-    <div class="results-wrap" data-bind="visible:hasData() && !hasAjaxError()">
+
+    <div class="encrypted-result" data-bind="visible:hasData() && isEncrypted()">
+        <div class="row">
+            <div class="col-sm-12">
+                <div class="alert alert-info">
+                    <div class="row">
+                        <div class="col-sm-12">
+                            <div class="pull-right"><strong>Server Response Time:</strong> <span data-bind="text:serviceRequestTime"></span> ms</div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-sm-12">
+                            <div class="pull-right"><strong>Total Data Retrieved:</strong> <span data-bind="text:totalData"></span> <span data-bind="text:dataMeasurement"></span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="well well-lg">
+            <div class="form-group"><strong>Encrypted Response <small>(<span data-bind="text:serviceRequestTime"></span> ms Response Time)</small></strong>
+            </div>
+            <div class="form-group" style="max-height: 400px; overflow-y: scroll;">
+                <span style="word-break: break-all;" data-bind="text: encryptedData"></span>
+            </div>
+            <div>
+                <button type="button" data-bind="click: decryptData" class="btn btn-success">Decrypt Response</button>
+            </div>
+        </div>
+    </div>
+
+
+    <div class="results-wrap" data-bind="visible:hasData() && showDecrypted()">
         <div class="row">
             <div class="col-sm-12">
                 <h3>
@@ -41,13 +72,6 @@
                 </h3>
             </div>
         </div>
-        @*<div class="row">
-                <div class="col-sm-12">
-                    <div class="pull-right">
-                        <strong>Showing <span data-bind="text:totalDisplayed"></span> of <span data-bind="text: totalResults"></span> records</strong>
-                    </div>
-                </div>
-            </div>*@
         <div class="row">
             <div class="col-sm-12">
                 <div class="alert alert-info">
@@ -96,7 +120,7 @@
 
 <script>
     /**Cascading Dropdowns Example: http://jsfiddle.net/GWVW8/2/ **/
-    var ServiceMethodViewModel = function (itm, parent) {
+    var ServiceMethodViewModel = function(itm, parent) {
         var self = this;
 
         if (itm === null || itm === 'undefined') return;
@@ -107,7 +131,7 @@
         self.url = parent.url + ':' + parent.port + '/' + self.path;
     };
 
-    var ServiceViewModel = function (itm) {
+    var ServiceViewModel = function(itm) {
         var self = this;
 
         if (itm === null || itm === 'undefined') return;
@@ -118,21 +142,21 @@
         self.port = itm.Port;
         self.methods = [];
 
-        for (var i = 0; i < itm.Methods.length; i++) {
-            var method = new ServiceMethodViewModel(itm.Methods[i], self);
+        for (var i = 0; i < itm.EncryptedMethods.length; i++) {
+            var method = new ServiceMethodViewModel(itm.EncryptedMethods[i], self);
             self.methods.push(method);
         }
     }
 
-    var SearchServicesViewModel = function () {
+    var SearchServicesViewModel = function() {
         var self = this;
 
         function getById(items, value) {
-            if (!value) {
+            if(!value) {
                 return [];
             }
 
-            var result = ko.utils.arrayFirst(items, function (item) {
+            var result = ko.utils.arrayFirst(items, function(item) {
                 return item.id === value;
             });
 
@@ -150,18 +174,22 @@
         }
 
         //Handle Change to Service Drop Down
-        self.serviceMethods = ko.computed(function () {
+        self.serviceMethods = ko.computed(function() {
             var items = self.services;
             var id = self.selectedService();
             return getById(items, id);
         });
 
         self.enableGoButton = ko.observable(false);
-        self.selectedServiceMethod.subscribe(function (newVal) {
+        self.selectedServiceMethod.subscribe(function(newVal) {
             var enableButton = self.serviceMethods().length > 0 && typeof newVal !== 'undefined';
 
             self.enableGoButton(enableButton);
         });
+
+        self.isEncrypted = ko.observable(false);
+        self.showDecrypted = ko.observable(false);
+        self.encryptedData = ko.observable();
 
         //Service Response Data
         self.isLoading = ko.observable(false);
@@ -174,93 +202,93 @@
         self.maxRecordsToShow = 50;
         self.totalKb = ko.observable(0);
         self.totalBytes = ko.observable(0);
-        self.dataMeasurement = ko.computed(function () {
+        self.dataMeasurement = ko.computed(function() {
             return self.totalBytes() >= 1000 ? "Kb" : "b";
         });
 
-        self.totalData = ko.computed(function () {
+        self.totalData = ko.computed(function() {
             return self.totalBytes() >= 1000 ? self.totalKb() : self.totalBytes();
         });
 
         self.hasAjaxError = ko.observable(false);
         self.ajaxErrorMessage = ko.observable('');
 
-        //Handle Button Click
-        self.loadServiceMethod = function () {
+        //Handle Get Service Method Click
+        self.loadServiceMethod = function() {
             self.isLoading(true);
-            self.results([]);
+            self.showDecrypted(false);
 
             jQuery.ajax({
                 type: 'POST',
-                url: serviceListData.serviceCallUrl,
-                start_time: new Date().getTime(),
+                url: serviceListData.apiUrlBase + '/callmicroservice',
                 data: {
                     url: self.selectedServiceMethod()
                 }
-            }).done(function (data) {
-
-                if (data.Data === null) {
-                    self.hasData(false);
-                    self.hasAjaxError(true);
-                    self.ajaxErrorMessage('Error: No data returned from the server');
-
-                    return;
-                }
-
+            }).done(function(data) {
                 self.hasData(true);
-
-                var isResultArray = Array.isArray(data.Data);
-
                 self.serviceRequestTime(data.TimeElapsedMs);
                 self.totalBytes(data.TotalBytes);
-
-                if (self.totalBytes() >= 1000) { }
                 self.totalKb(data.TotalKB);
-
-                var firstItemInResults = {};
-                if (isResultArray) {
-                    firstItemInResults = data.Data[0];
-
-                    //self.results(data.Data.length > 50 ? data.Data.splice(0, 50) : data.Data);
-                    self.results(data.Data);
-                    self.totalDisplayed(data.Data.length);
-
-                } else {
-
-                    if (self.selectedServiceMethod().indexOf('services') !== -1) {
-                        firstItemInResults = data.Data.services[0];
-                        self.results(data.Data.services);
-                    } else {
-                        firstItemInResults = data.Data;
-                        self.results(data.Data);
-                    }
-
-
-                    self.totalDisplayed(self.results().length);
-                }
-
-                self.totalResults(self.results().length);
-
-                self.resultColumns(serviceListData.generateColumnHeaders(firstItemInResults));
-                self.hasAjaxError(false);
-
-            }).fail(function (requestObj, text, errorMessage) {
+                self.encryptedData(data.Data);
+                self.isEncrypted(true);
+            }).fail(function(requestObj, text, errorMessage) {
                 self.hasAjaxError(true);
 
                 var errorMessage = '<strong>Error:</strong> ' + requestObj.status + ' - ' + errorMessage;
 
                 self.ajaxErrorMessage(errorMessage);
 
-            }).always(function () {
+            }).always(function() {
                 self.isLoading(false);
             });
         };
 
-        self.resetPage = function () {
+        self.decryptData = function () {
+            self.isLoading(true);
+            jQuery.ajax({
+                type: 'POST',
+                url: serviceListData.apiUrlBase + '/decryptserviceresponse',
+                data: {data : self.encryptedData()}
+            }).done(function(data) {
+                self.hasData(true);
+                self.totalBytes(data.TotalBytes);
+                self.totalKb(data.TotalKB);
+
+                var firstItemInResults = {};
+
+                if (self.selectedServiceMethod().indexOf('services/e') !== -1) {
+                    firstItemInResults = data.Data.services[0];
+                    self.results(data.Data.services);
+                } else {
+                    firstItemInResults = data.Data[0];
+                    self.results(data.Data);
+                }
+
+                self.totalResults(data.Data.length);
+
+                self.resultColumns(serviceListData.generateColumnHeaders(firstItemInResults));
+                self.hasAjaxError(false);
+                self.isEncrypted(false);
+                self.showDecrypted(true);
+            }).fail(function(requestObj, text, errorMessage) {
+                self.hasAjaxError(true);
+
+                var errorMessage = '<strong>Error:</strong> ' + requestObj.status + ' - ' + errorMessage;
+
+                self.ajaxErrorMessage(errorMessage);
+
+            }).always(function() {
+                self.isLoading(false);
+            });;
+        };
+
+        self.resetPage = function() {
             self.hasData(false);
             self.selectedService(null);
             self.selectedServiceMethod(null);
             self.results([]);
+            self.encryptedData(null);
+            self.showDecrypted(false);
             self.isLoading(false);
             self.hasAjaxError(false);
             self.totalResults(0);
@@ -270,7 +298,7 @@
         };
     };
 
-    jQuery(document).ready(function () {
+    jQuery(document).ready(function() {
         var vm = new SearchServicesViewModel();
         ko.applyBindings(vm, document.getElementById('serviceDemo'));
     });

@@ -9,5 +9,12 @@ namespace MS_Demo_Client.Models
     {
         public int TimeElapsedMs { get; set; }
         public object Data { get; set; }
+
+        public int TotalBytes { get; set; }
+
+        public int TotalKB
+        {
+            get { return this.TotalBytes / 1000; }
+        }
     }
 }
